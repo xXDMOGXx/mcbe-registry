@@ -14,7 +14,7 @@ Requires Minecraft Bedrock **1.21.100+** and stable Script API `@minecraft/serve
 
 There is no resource pack.
 
-Vanilla catalog snapshots in this pack (`src/vanillaCatalog.ts`, `src/vanillaItemTags.ts`) are Mojang data, not MIT — see `NOTICE`. Source: [xXDMOGXx/mcbe-registry](https://github.com/xXDMOGXx/mcbe-registry) (MIT except that snapshot).
+Vanilla catalog snapshots in this pack (`src/vanillaCatalog.ts`, `src/vanillaItemTags.ts`) are Mojang data, not MIT — see `NOTICE`. Source: [xXDMOGXx/mcbe-registry](https://github.com/xXDMOGXx/mcbe-registry) (MIT except that snapshot). Fork and rebuild for your own world; this tree is not a contribution project.
 
 ## For other addons
 
