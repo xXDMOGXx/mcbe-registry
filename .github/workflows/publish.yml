@@ -1,0 +1,53 @@
+# Publish @mcbe-registry/host via npm trusted publishing (OIDC).
+# No NPM_TOKEN. One-time setup (maintainer, interactive): see MAINTAINING.md.
+name: Publish Package
+
+on:
+  push:
+    tags:
+      - "v*"
+    workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Ensure npm CLI supports OIDC
+        run: npm install -g npm@latest
+
+      - name: Install
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Skip if this version is already on npm
+        id: check
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          if npm view "@mcbe-registry/host@${VERSION}" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Version ${VERSION} already published — skipping."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish
+        if: steps.check.outputs.exists == 'false'
+        run: npm publish --access public

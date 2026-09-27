@@ -1,0 +1,54 @@
+{
+  "name": "@mcbe-registry/host",
+  "version": "0.3.0",
+  "description": "Recipe Registry host catalog and script-only Bedrock behavior pack (schema 3). Vanilla snapshots are Mojang data; see NOTICE.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vanilla": "./src/vanillaCatalog.ts"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src",
+    "engine",
+    "scripts",
+    "assets",
+    "README.md",
+    "GUIDE.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsx scripts/build-pack.ts",
+    "package": "tsx scripts/package-pack.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "regen:vanilla": "tsx scripts/regen-vanilla-catalog.ts",
+    "sample-regen": "tsx scripts/sampleRegen.ts"
+  },
+  "dependencies": {
+    "@mcbe-reciperegistry/client": "^0.2.0",
+    "mcbe-ipc": "^3.4.2"
+  },
+  "devDependencies": {
+    "@minecraft/server": "2.8.0",
+    "@types/node": "^20.14.0",
+    "esbuild": "^0.23.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xXDMOGXx/mcbe-registry.git"
+  },
+  "homepage": "https://github.com/xXDMOGXx/mcbe-registry#readme",
+  "bugs": {
+    "url": "https://github.com/xXDMOGXx/mcbe-registry/issues"
+  }
+}

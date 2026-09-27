@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["engine/**/*.ts", "scripts/**/*.ts", "src/**/*.ts", "pack.config.ts"],
+  "exclude": ["**/*.test.ts", "dist/**", "satellite/**"]
+}

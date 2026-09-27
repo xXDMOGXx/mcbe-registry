@@ -1,0 +1,68 @@
+# GitHub Release for recipe-registry-x.y.z.mcaddon. No CurseForge. No Omniac sources.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm test
+
+      - run: npm run build
+
+      - run: npm run package
+
+      - name: Versioned mcaddon name
+        id: pack
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v${VERSION}"
+          cp dist/recipe-registry.mcaddon "dist/recipe-registry-${VERSION}.mcaddon"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "file=dist/recipe-registry-${VERSION}.mcaddon" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.pack.outputs.version }}"
+          NOTES="Recipe Registry ${VERSION}."
+          if [ -f CHANGELOG.md ]; then
+            NOTES_FILE=release-notes.md
+            awk -v ver="$VERSION" '
+              $0 == "## " ver { keep=1; next }
+              keep && /^## / { exit }
+              keep { print }
+            ' CHANGELOG.md | sed -e 's/[[:space:]]*$//' > "$NOTES_FILE"
+            if [ -s "$NOTES_FILE" ]; then
+              { echo "## Recipe Registry ${VERSION}"; echo; cat "$NOTES_FILE"; } > "${NOTES_FILE}.tmp"
+              mv "${NOTES_FILE}.tmp" "$NOTES_FILE"
+            else
+              printf '%s\n' "$NOTES" > "$NOTES_FILE"
+            fi
+          else
+            NOTES_FILE=release-notes.md
+            printf '%s\n' "$NOTES" > "$NOTES_FILE"
+          fi
+          gh release create "${{ steps.pack.outputs.tag }}" \
+            "${{ steps.pack.outputs.file }}" \
+            --title "Recipe Registry ${VERSION}" \
+            --notes-file "$NOTES_FILE"
