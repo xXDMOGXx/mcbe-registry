@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PROTOCOL_SCHEMA } from "@mcbe-reciperegistry/client";
+import { PROTOCOL_SCHEMA } from "@mcbe-registry/client";
 import { EVENT } from "./protocol.js";
 import { createRegistryHost } from "./rpcHost.js";
 
@@ -41,6 +41,15 @@ describe("createRegistryHost", () => {
         inputs: ["minecraft:beef"],
       }),
     );
+    expect(sent).toEqual([]);
+  });
+
+  it("ignores schema-3 JSON discovery", () => {
+    const sent: { id: string; message: string }[] = [];
+    const host = createRegistryHost({
+      send: (id, message) => sent.push({ id, message }),
+    });
+    host.onEvent("reciperegistry:hello", JSON.stringify({ v: 3, schema: 3 }));
     expect(sent).toEqual([]);
   });
 });

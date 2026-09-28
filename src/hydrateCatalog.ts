@@ -5,23 +5,37 @@ import type { PersistSession } from "./persist.js";
 export const CATALOG_HYDRATE_BUDGET = 150;
 
 /**
- * Registers vanilla recipes, snapshots vanilla, then starts persist grace.
- * Yields after every {@link CATALOG_HYDRATE_BUDGET} registers. Overlay waits on ping.
+ * Registers vanilla fluids, loot, and recipes, snapshots vanilla, overlays persist
+ * blobs, then starts persist grace. Yields after every {@link CATALOG_HYDRATE_BUDGET}
+ * vanilla registers and after each persist blob.
  */
 export function* hydrateCatalogJob(
   catalog: Catalog,
   vanilla: readonly unknown[],
   persist: PersistSession,
+  extras?: { fluids?: readonly unknown[]; loot?: readonly unknown[] },
 ): Generator<void, void, void> {
   let n = 0;
-  for (const recipe of vanilla) {
-    catalog.register(recipe);
+  /** Registers vanilla fluids, loot, and recipes; yields after every {@link CATALOG_HYDRATE_BUDGET} stores. */
+  const bump = function* (): Generator<void, void, void> {
     n++;
     if (n >= CATALOG_HYDRATE_BUDGET) {
       n = 0;
       yield;
     }
+  };
+  for (const fluid of extras?.fluids ?? []) {
+    catalog.registerDocument("fluid", fluid);
+    yield* bump();
+  }
+  for (const loot of extras?.loot ?? []) {
+    catalog.registerDocument("loot", loot);
+    yield* bump();
+  }
+  for (const recipe of vanilla) {
+    catalog.register(recipe);
+    yield* bump();
   }
   catalog.snapshotVanilla();
-  persist.startGrace();
+  yield* persist.loadFromWorldJob();
 }

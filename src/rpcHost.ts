@@ -1,6 +1,6 @@
 import { stringifyEnvelope } from "./compactJson.js";
 import { EVENT } from "./protocol.js";
-import { PROTOCOL_SCHEMA } from "@mcbe-reciperegistry/client";
+import { PROTOCOL_SCHEMA } from "@mcbe-registry/client";
 
 /** Host-side send: event id plus compact JSON. */
 export type HostSend = (id: string, message: string) => void;
@@ -9,11 +9,11 @@ export type HostSend = (id: string, message: string) => void;
 export interface RegistryHost {
   /** Handles one inbound script-event. Data-op ids are ignored. */
   onEvent(id: string, message: string): void;
-  /** Broadcasts `reciperegistry:ready`. */
+  /** Broadcasts `bedrockregistry:ready`. */
   broadcastReady(): void;
 }
 
-/** Discovery-only JSON host (`hello` / `ready`). Catalog data ops are schema-3 IPC. */
+/** Discovery-only JSON host (`hello` / `ready`). Catalog data ops are schema-4 IPC. */
 export function createRegistryHost(options: {
   send: HostSend;
   /** Vanilla snapshot Minecraft version announced on `ready`. */

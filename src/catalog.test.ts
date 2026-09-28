@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createCatalog } from "./catalog.js";
 import { matchRecipeIds, matchRecipeResults } from "./match.js";
 import { VANILLA_RECIPES } from "./vanillaCatalog.js";
-import { VANILLA_ITEM_TAGS } from "./vanillaProject.js";
+import { VANILLA_ITEM_TAGS, VANILLA_BLOCK_TAGS } from "./vanillaProject.js";
 
 describe("createCatalog", () => {
   it("stores a four-field recipe without duration or energy", () => {
@@ -120,6 +120,19 @@ describe("createCatalog", () => {
     ]);
   });
 
+  it("lists recipes by fluid input id without matching the bucket item", () => {
+    const catalog = createCatalog();
+    catalog.register({
+      id: "m:wet",
+      stations: ["m:tank"],
+      inputs: [{ fluid: "minecraft:water", amount: 3000 }],
+      outputs: ["minecraft:wet_sponge"],
+    });
+    expect(catalog.list({ input: "minecraft:water" }).map((row) => row.id)).toEqual(["m:wet"]);
+    expect(catalog.list({ input: "minecraft:water_bucket" })).toEqual([]);
+    expect(catalog.matchIds({ station: "m:tank", inputs: ["minecraft:water_bucket"] })).toEqual([]);
+  });
+
   it("replace and unregister keep the output index in sync", () => {
     const catalog = createCatalog();
     catalog.register({
@@ -141,7 +154,8 @@ describe("createCatalog", () => {
   });
 
   it("matchIds uses station and count postings, not a full catalog scan", () => {
-    const catalog = createCatalog();
+    const tags = { "minecraft:oak_planks": ["minecraft:planks"] };
+    const catalog = createCatalog({ tags: { item: tags } });
     catalog.register({
       id: "addon:stick",
       stations: ["minecraft:crafting_table"],
@@ -167,39 +181,29 @@ describe("createCatalog", () => {
       outputs: ["minecraft:stone"],
       type: "smelt",
     });
-    const tags = { "minecraft:oak_planks": ["minecraft:planks"] };
     expect(
-      catalog.matchIds(
-        {
-          station: "minecraft:crafting_table",
-          pattern: ["A", "A"],
-          key: { A: "minecraft:oak_planks" },
-        },
-        tags,
-      ),
+      catalog.matchIds({
+        station: "minecraft:crafting_table",
+        pattern: ["A", "A"],
+        key: { A: "minecraft:oak_planks" },
+      }),
     ).toEqual(["addon:stick"]);
     expect(
-      catalog.matchIds(
-        {
-          station: "minecraft:crafting_table",
-          pattern: ["AAA", "A A", "AAA"],
-          key: { A: "minecraft:oak_planks" },
-        },
-        tags,
-      ),
+      catalog.matchIds({
+        station: "minecraft:crafting_table",
+        pattern: ["AAA", "A A", "AAA"],
+        key: { A: "minecraft:oak_planks" },
+      }),
     ).toEqual(["addon:chest"]);
+    expect(catalog.matchIds({ station: "minecraft:furnace", inputs: ["minecraft:cobblestone"] })).toEqual([
+      "addon:furnace_cobble",
+    ]);
     expect(
-      catalog.matchIds({ station: "minecraft:furnace", inputs: ["minecraft:cobblestone"] }, tags),
-    ).toEqual(["addon:furnace_cobble"]);
-    expect(
-      catalog.matchIds(
-        {
-          station: "minecraft:crafting_table",
-          pattern: ["AAA", "A A", "AAA"],
-          key: { A: "minecraft:cobblestone" },
-        },
-        tags,
-      ),
+      catalog.matchIds({
+        station: "minecraft:crafting_table",
+        pattern: ["AAA", "A A", "AAA"],
+        key: { A: "minecraft:cobblestone" },
+      }),
     ).toEqual([]);
   });
 
@@ -298,10 +302,42 @@ describe("createCatalog", () => {
     expect(catalog.recipesForSource("alpha")).toEqual([]);
     expect(catalog.get("shared:x")!.outputs).toEqual(["minecraft:c"]);
   });
+
+  it("stores item documents independently of recipes", () => {
+    const catalog = createCatalog();
+    catalog.register(
+      {
+        id: "demo:craft",
+        stations: ["s"],
+        inputs: ["minecraft:a"],
+        outputs: ["minecraft:b"],
+      },
+      "demo",
+    );
+    expect(
+      catalog.registerDocument("item", { id: "demo:widget", extra: { keep: true }, texture: "demo/widget" }, "demo"),
+    ).toBe(true);
+    expect(catalog.getDocument("item", "demo:widget")).toEqual({
+      id: "demo:widget",
+      extra: { keep: true },
+      texture: "demo/widget",
+    });
+    expect(catalog.listDocuments("item").map((row) => row.id)).toEqual(["demo:widget"]);
+    expect(catalog.overlaySources("item")).toEqual(["demo"]);
+    expect(catalog.overlaySources("recipe")).toEqual(["demo"]);
+    catalog.replaceSource("demo", [{ id: "demo:widget", extra: { keep: false } }], "item");
+    expect(catalog.get("demo:craft")?.outputs).toEqual(["minecraft:b"]);
+    expect(catalog.getDocument("item", "demo:widget")?.extra).toEqual({ keep: false });
+  });
+
+  it("rejects unknown kinds", () => {
+    const catalog = createCatalog();
+    expect(catalog.registerDocument("machine", { id: "x" })).toBe(false);
+  });
 });
 
 describe("catalog match index agrees with a full scan", () => {
-  const catalog = createCatalog();
+  const catalog = createCatalog({ tags: { item: VANILLA_ITEM_TAGS } });
   for (const recipe of VANILLA_RECIPES) catalog.register(recipe);
 
   const queries = [
@@ -337,12 +373,81 @@ describe("catalog match index agrees with a full scan", () => {
 
   it("returns the same ids and yields as scanning VANILLA_RECIPES", () => {
     for (const query of queries) {
-      expect(catalog.matchIds(query, VANILLA_ITEM_TAGS)).toEqual(
-        matchRecipeIds(VANILLA_RECIPES, query, VANILLA_ITEM_TAGS),
-      );
-      expect(catalog.matchResults(query, VANILLA_ITEM_TAGS)).toEqual(
-        matchRecipeResults(VANILLA_RECIPES, query, VANILLA_ITEM_TAGS),
-      );
+      expect(catalog.matchIds(query)).toEqual(matchRecipeIds(VANILLA_RECIPES, query, VANILLA_ITEM_TAGS));
+      expect(catalog.matchResults(query)).toEqual(matchRecipeResults(VANILLA_RECIPES, query, VANILLA_ITEM_TAGS));
     }
+  });
+});
+
+describe("pack item tag indexes", () => {
+  it("lists pack rows by displayName creator namespace and source", () => {
+    const catalog = createCatalog();
+    catalog.registerDocument(
+      "pack",
+      { id: "alpha", source: "alpha", displayName: "Shared", version: "1", namespace: "a", creator: "ann" },
+      "alpha",
+    );
+    catalog.registerDocument(
+      "pack",
+      { id: "beta", source: "beta", displayName: "Shared", version: "2", namespace: "b", creator: "bob" },
+      "beta",
+    );
+    expect(catalog.listDocuments("pack", { displayName: "Shared" }).map((row) => row.id).sort()).toEqual(["alpha", "beta"]);
+    expect(catalog.listDocuments("pack", { creator: "ann" }).map((row) => row.id)).toEqual(["alpha"]);
+    expect(catalog.listDocuments("pack", { namespace: "b" }).map((row) => row.id)).toEqual(["beta"]);
+    expect(catalog.listDocuments("pack", { source: "beta" }).map((row) => row.id)).toEqual(["beta"]);
+    expect(catalog.getDocument("pack", "alpha")).toMatchObject({ creator: "ann", version: "1" });
+  });
+
+  it("unions overlay tags and tag documents and retracts only the dropped source", () => {
+    const catalog = createCatalog();
+    catalog.registerDocument("item", { id: "mymod:bar", tags: ["mymod:ingots"], texture: "mymod/bar" }, "items");
+    catalog.registerDocument(
+      "tag",
+      { id: "mymod:ingots", domain: "item", members: ["minecraft:iron_ingot"] },
+      "tags",
+    );
+    expect(catalog.getDocument("item", "mymod:bar")).toMatchObject({ texture: "mymod/bar" });
+    expect(catalog.listDocuments("tag", { domain: "item", id: "mymod:ingots" }).map((row) => row.id).sort()).toEqual([
+      "minecraft:iron_ingot",
+      "mymod:bar",
+    ]);
+    catalog.register({
+      id: "mymod:ingot_recipe",
+      stations: ["s"],
+      inputs: [{ tag: "mymod:ingots" }],
+      outputs: ["mymod:block"],
+    });
+    expect(catalog.matchIds({ station: "s", inputs: ["mymod:bar"] })).toEqual(["mymod:ingot_recipe"]);
+    expect(catalog.matchIds({ station: "s", inputs: ["minecraft:iron_ingot"] })).toEqual(["mymod:ingot_recipe"]);
+    catalog.dropSource("items");
+    expect(catalog.getDocument("item", "mymod:bar")).toBeUndefined();
+    expect(catalog.listDocuments("tag", { domain: "item", id: "mymod:ingots" }).map((row) => row.id)).toEqual([
+      "minecraft:iron_ingot",
+    ]);
+    expect(catalog.matchIds({ station: "s", inputs: ["mymod:bar"] })).toEqual([]);
+    expect(catalog.matchIds({ station: "s", inputs: ["minecraft:iron_ingot"] })).toEqual(["mymod:ingot_recipe"]);
+  });
+
+  it("keeps stolen item tag writes until that source is dropped", () => {
+    const catalog = createCatalog();
+    catalog.registerDocument("item", { id: "shared:x", tags: ["mymod:ingots"] }, "alpha");
+    catalog.replaceSource("beta", [{ id: "shared:x", tags: [] }], "item");
+    expect(catalog.sourceOfDocument("item", "shared:x")).toBe("beta");
+    expect(catalog.listDocuments("tag", { id: "mymod:ingots" }).map((row) => row.id)).toEqual(["shared:x"]);
+    catalog.dropSource("alpha");
+    expect(catalog.listDocuments("tag", { id: "mymod:ingots" })).toEqual([]);
+  });
+
+  it("lists vanilla plank and block tag members with no overlay documents", () => {
+    const catalog = createCatalog({ tags: { item: VANILLA_ITEM_TAGS, block: VANILLA_BLOCK_TAGS } });
+    const planks = catalog.listDocuments("tag", { domain: "item", id: "minecraft:planks" }).map((row) => row.id);
+    expect(planks).toContain("minecraft:oak_planks");
+    expect(catalog.getDocument("item", "minecraft:oak_planks")).toBeUndefined();
+    const diggable = catalog
+      .listDocuments("tag", { domain: "block", id: "minecraft:diamond_pick_diggable" })
+      .map((row) => row.id);
+    expect(diggable).toContain("minecraft:diamond_ore");
+    expect(catalog.getDocument("block", "minecraft:diamond_ore")).toBeUndefined();
   });
 });

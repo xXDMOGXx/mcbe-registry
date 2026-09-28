@@ -15,24 +15,28 @@ vi.mock("mcbe-ipc", () => ({
   },
 }));
 
-vi.mock("@mcbe-reciperegistry/client/mcbe-ipc", () => ({
+vi.mock("@mcbe-registry/client/mcbe-ipc", () => ({
   peerIpcFromMcbe: () => ({
+    send() {},
     invoke: async () => {
       throw new Error("unused in host unit tests");
     },
+    on: () => () => {},
     handle: () => () => {},
   }),
   ipcStringFromMcbe: () => ({
+    send() {},
     invoke: async () => {
       throw new Error("unused in host unit tests");
     },
+    on: () => () => {},
     handle: () => () => {},
   }),
 }));
 
-import { resetMinecraftServerFake, system, world } from "@mcbab/minecraft-server-fake";
-import { HOST_LOADED_MESSAGE } from "@mcbe-reciperegistry/client";
-import { startRecipeRegistryHost } from "./host.js";
+import { resetMinecraftServerFake, system, world } from "@minecraft/server";
+import { HOST_LOADED_MESSAGE } from "@mcbe-registry/client";
+import { startBedrockRegistryHost } from "./host.js";
 
 afterEach(() => {
   resetMinecraftServerFake();
@@ -47,30 +51,31 @@ function tickUntil(predicate: () => boolean, maxTicks = 5000): void {
   throw new Error("timed out waiting for host");
 }
 
-describe("startRecipeRegistryHost", () => {
+describe("startBedrockRegistryHost", () => {
   it("broadcasts ready after hydrate and answers hello", () => {
     const received: { id: string; message: string }[] = [];
     system.afterEvents.scriptEventReceive.subscribe((event) => {
       received.push({ id: event.id, message: event.message });
     });
-    startRecipeRegistryHost();
-    expect(received.some((event) => event.id === "reciperegistry:ready")).toBe(false);
+    startBedrockRegistryHost();
+    expect(received.some((event) => event.id === "bedrockregistry:ready")).toBe(false);
     const log = vi.spyOn(console, "log");
-    tickUntil(() => received.some((event) => event.id === "reciperegistry:ready"));
+    tickUntil(() => received.some((event) => event.id === "bedrockregistry:ready"));
     expect(log).toHaveBeenCalledWith(HOST_LOADED_MESSAGE);
-    system.sendScriptEvent("reciperegistry:hello", '{"v":1}');
-    expect(received.filter((event) => event.id === "reciperegistry:ready").length).toBeGreaterThan(1);
+    system.sendScriptEvent("bedrockregistry:hello", '{"v":1}');
+    expect(received.filter((event) => event.id === "bedrockregistry:ready").length).toBeGreaterThan(1);
   });
 
-  it("does not read world dynamic property ids before ready", () => {
+  it("overlays persist world keys before ready", () => {
     const spy = vi.spyOn(world, "getDynamicPropertyIds");
     const received: { id: string; message: string }[] = [];
     system.afterEvents.scriptEventReceive.subscribe((event) => {
       received.push({ id: event.id, message: event.message });
     });
-    startRecipeRegistryHost();
-    tickUntil(() => received.some((event) => event.id === "reciperegistry:ready"));
-    expect(spy).not.toHaveBeenCalled();
+    startBedrockRegistryHost();
+    expect(received.some((event) => event.id === "bedrockregistry:ready")).toBe(false);
+    tickUntil(() => received.some((event) => event.id === "bedrockregistry:ready"));
+    expect(spy).toHaveBeenCalled();
   });
 
   it("does not answer schema-1 JSON data ops", () => {
@@ -78,8 +83,8 @@ describe("startRecipeRegistryHost", () => {
     system.afterEvents.scriptEventReceive.subscribe((event) => {
       received.push({ id: event.id, message: event.message });
     });
-    startRecipeRegistryHost();
-    tickUntil(() => received.some((event) => event.id === "reciperegistry:ready"));
+    startBedrockRegistryHost();
+    tickUntil(() => received.some((event) => event.id === "bedrockregistry:ready"));
     const before = received.length;
     system.sendScriptEvent(
       "reciperegistry:result",
@@ -91,5 +96,18 @@ describe("startRecipeRegistryHost", () => {
       }),
     );
     expect(received.slice(before).some((event) => event.id === "reciperegistry:reply")).toBe(false);
+  });
+
+  it("does not answer schema-3 JSON hello", () => {
+    const received: { id: string; message: string }[] = [];
+    system.afterEvents.scriptEventReceive.subscribe((event) => {
+      received.push({ id: event.id, message: event.message });
+    });
+    startBedrockRegistryHost();
+    tickUntil(() => received.some((event) => event.id === "bedrockregistry:ready"));
+    const before = received.length;
+    system.sendScriptEvent("reciperegistry:hello", '{"v":3,"schema":3}');
+    expect(received.slice(before).some((event) => event.id === "reciperegistry:ready")).toBe(false);
+    expect(received.slice(before).some((event) => event.id === "bedrockregistry:ready")).toBe(false);
   });
 });

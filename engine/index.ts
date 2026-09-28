@@ -1,16 +1,19 @@
 import { system, world } from "@minecraft/server";
-import { HOST_CLAIM_PROPERTY, shouldClaimHost, stillOwnsHostClaim } from "../src/hostClaim.js";
-import { startRecipeRegistryHost } from "./host.js";
-
-const CLAIMANT = "reciperegistry";
+import {
+  HOST_CLAIM_PROPERTY,
+  STANDALONE_HOST_CLAIMANT,
+  runHostElection,
+} from "../src/hostClaim.js";
+import { transportFromSystem } from "../src/transport.js";
+import { startBedrockRegistryHost } from "./host.js";
 
 system.run(() => {
-  const existing = world.getDynamicProperty(HOST_CLAIM_PROPERTY) as string | undefined;
-  if (!shouldClaimHost(existing, CLAIMANT)) return;
-  world.setDynamicProperty(HOST_CLAIM_PROPERTY, CLAIMANT);
-  system.run(() => {
-    const stored = world.getDynamicProperty(HOST_CLAIM_PROPERTY) as string | undefined;
-    if (!stillOwnsHostClaim(stored, CLAIMANT)) return;
-    startRecipeRegistryHost();
+  runHostElection({
+    transport: transportFromSystem(system),
+    claimant: STANDALONE_HOST_CLAIMANT,
+    onElected() {
+      world.setDynamicProperty(HOST_CLAIM_PROPERTY, STANDALONE_HOST_CLAIMANT);
+      startBedrockRegistryHost();
+    },
   });
 });

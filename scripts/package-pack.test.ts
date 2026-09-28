@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
-import { packageRecipeRegistryPack } from "./package-pack.js";
+import { packageBedrockRegistryPack } from "./package-pack.js";
 
 const temps: string[] = [];
 
@@ -13,15 +13,15 @@ afterEach(() => {
   }
 });
 
-describe("packageRecipeRegistryPack", () => {
-  it("zips dist/BP as BP/ inside recipe-registry.mcaddon", () => {
+describe("packageBedrockRegistryPack", () => {
+  it("zips dist/BP as BP/ inside bedrock-registry.mcaddon", () => {
     const modDir = fs.mkdtempSync(path.join(os.tmpdir(), "rr-package-"));
     temps.push(modDir);
     const bpDir = path.join(modDir, "dist", "BP");
     fs.mkdirSync(path.join(bpDir, "texts"), { recursive: true });
     fs.writeFileSync(path.join(bpDir, "manifest.json"), '{"format_version":2}\n');
-    const out = packageRecipeRegistryPack(modDir);
-    expect(out).toBe(path.join(modDir, "dist", "recipe-registry.mcaddon"));
+    const out = packageBedrockRegistryPack(modDir);
+    expect(out).toBe(path.join(modDir, "dist", "bedrock-registry.mcaddon"));
     expect(fs.existsSync(out)).toBe(true);
     const listed = spawnSync("python3", ["-c", "import sys, zipfile\nprint('\\n'.join(zipfile.ZipFile(sys.argv[1]).namelist()))", out], {
       encoding: "utf8",
@@ -33,6 +33,6 @@ describe("packageRecipeRegistryPack", () => {
   it("fails when dist/BP is missing", () => {
     const modDir = fs.mkdtempSync(path.join(os.tmpdir(), "rr-package-missing-"));
     temps.push(modDir);
-    expect(() => packageRecipeRegistryPack(modDir)).toThrow(/Missing dist\/BP/);
+    expect(() => packageBedrockRegistryPack(modDir)).toThrow(/Missing dist\/BP/);
   });
 });

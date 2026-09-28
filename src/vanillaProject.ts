@@ -30,6 +30,8 @@ export const VANILLA_REMAINDERS: Readonly<Record<string, string>> = {
 
 /** Vanilla item ids that carry item tags (v1 match has no ItemStack). Regenerated with the catalog. */
 export { VANILLA_ITEM_TAGS } from "./vanillaItemTags.js";
+/** Vanilla block ids that carry block tags. Regenerated with the catalog. */
+export { VANILLA_BLOCK_TAGS } from "./vanillaBlockTags.js";
 
 function qualifyMinecraft(id: string): string {
   return id.includes(":") ? id : `minecraft:${id}`;

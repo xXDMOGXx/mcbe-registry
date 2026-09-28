@@ -31,9 +31,9 @@ function recipe(id: string) {
 }
 
 describe("hydrateCatalogJob", () => {
-  it("does not overlay persist until hydrateSource after the job finishes", () => {
+  it("overlays persist after vanilla snapshot and before the job finishes", () => {
     const store = memoryStore();
-    writeSource(store, "demo", "fp-demo", [recipe("demo:overlay")]);
+    writeSource(store, "demo", "recipe", "fp-demo", [recipe("demo:overlay")]);
     const catalog = createCatalog();
     const persist = attachPersist(catalog, store, { runTimeout() {} });
     const vanilla = Array.from({ length: CATALOG_HYDRATE_BUDGET + 1 }, (_, i) => recipe(`test:r${i}`));
@@ -46,8 +46,6 @@ describe("hydrateCatalogJob", () => {
       /* drain yields */
     }
     expect(catalog.get("test:r0")).toBeDefined();
-    expect(catalog.get("demo:overlay")).toBeUndefined();
-    persist.hydrateSource("demo");
     expect(catalog.get("demo:overlay")?.outputs).toEqual(["demo:overlay"]);
   });
 });

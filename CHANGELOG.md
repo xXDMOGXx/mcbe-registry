@@ -1,4 +1,14 @@
-# @mcbab-mods/recipe-registry
+# @mcbab-mods/bedrock-registry
+
+## 1.0.0
+
+### Major Changes
+
+- **Bedrock Registry.** Pack-list name is Bedrock Registry. Same behavior-pack UUID as Recipe Registry (`33303c67-a05d-4964-b2c3-ba7c42d8d3b6`); worlds that already depend on that UUID keep working. Manifest version is `[1, 0, 0]`.
+- **Schema 4.** Catalog traffic is `bedrockregistry.*` (IPC + JSON hello/ready). Schema 3 `@mcbe-reciperegistry/client` / `reciperegistry.*` gets no replies. Leftover `reciperegistry:` dynamic properties are left in the world and ignored.
+- **Multi-kind catalog.** Packs, recipes, items, blocks, entities, fluids, gases, tags, and loot. Register and fingerprint per `(source, kind)` — an item overlay does not rewrite that pack’s recipe blob.
+- **Vanilla snapshots in the host.** Recipes, water/lava, item and block tags, and entity/block loot (bedrock-samples plus an engine-gap dump). Mojang data — see `NOTICE`.
+- **Public client.** `@mcbe-registry/client` (npm) and drop-in `bedrock-registry-client.js` on the Release. Docs: [client wiki](https://github.com/xXDMOGXx/mcbe-registry-client/wiki). Authors must update from `@mcbe-reciperegistry/client`.
 
 ## 0.3.0
 

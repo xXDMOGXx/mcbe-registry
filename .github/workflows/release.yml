@@ -1,4 +1,4 @@
-# GitHub Release for recipe-registry-x.y.z.mcaddon. No CurseForge. No Omniac sources.
+# GitHub Release for bedrock-registry-x.y.z.mcaddon. No CurseForge. No Omniac sources.
 name: Release
 
 on:
@@ -34,17 +34,17 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           TAG="v${VERSION}"
-          cp dist/recipe-registry.mcaddon "dist/recipe-registry-${VERSION}.mcaddon"
+          cp dist/bedrock-registry.mcaddon "dist/bedrock-registry-${VERSION}.mcaddon"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "file=dist/recipe-registry-${VERSION}.mcaddon" >> "$GITHUB_OUTPUT"
+          echo "file=dist/bedrock-registry-${VERSION}.mcaddon" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ steps.pack.outputs.version }}"
-          NOTES="Recipe Registry ${VERSION}."
+          NOTES="Bedrock Registry ${VERSION}."
           if [ -f CHANGELOG.md ]; then
             NOTES_FILE=release-notes.md
             awk -v ver="$VERSION" '
@@ -53,7 +53,7 @@ jobs:
               keep { print }
             ' CHANGELOG.md | sed -e 's/[[:space:]]*$//' > "$NOTES_FILE"
             if [ -s "$NOTES_FILE" ]; then
-              { echo "## Recipe Registry ${VERSION}"; echo; cat "$NOTES_FILE"; } > "${NOTES_FILE}.tmp"
+              { echo "## Bedrock Registry ${VERSION}"; echo; cat "$NOTES_FILE"; } > "${NOTES_FILE}.tmp"
               mv "${NOTES_FILE}.tmp" "$NOTES_FILE"
             else
               printf '%s\n' "$NOTES" > "$NOTES_FILE"
@@ -64,5 +64,5 @@ jobs:
           fi
           gh release create "${{ steps.pack.outputs.tag }}" \
             "${{ steps.pack.outputs.file }}" \
-            --title "Recipe Registry ${VERSION}" \
+            --title "Bedrock Registry ${VERSION}" \
             --notes-file "$NOTES_FILE"

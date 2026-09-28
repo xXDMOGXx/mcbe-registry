@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createCatalog } from "./catalog.js";
 import { attachPersist } from "./persist.js";
-import { SYNC_GRACE_TICKS, readSource, writeSource, type DynamicPropertyStore } from "./sourceStore.js";
+import { SYNC_GRACE_TICKS, listPersistedSources, readSource, writeSource, type DynamicPropertyStore } from "./sourceStore.js";
 
 function memoryStore(): DynamicPropertyStore {
   const properties = new Map<string, string | number | boolean>();
@@ -49,7 +49,7 @@ const addon = {
 describe("attachPersist", () => {
   it("does not read world dynamic properties until loadFromWorld", () => {
     const store = memoryStore();
-    writeSource(store, "demo", "fp-demo", [addon]);
+    writeSource(store, "demo", "recipe", "fp-demo", [addon]);
     const catalog = createCatalog();
     attachPersist(catalog, store, deferredClock());
     expect(catalog.get("demo:fiber_block_from_fiber")).toBeUndefined();
@@ -57,7 +57,7 @@ describe("attachPersist", () => {
 
   it("overlays persisted recipes onto the catalog", () => {
     const store = memoryStore();
-    writeSource(store, "demo", "fp-demo", [addon]);
+    writeSource(store, "demo", "recipe", "fp-demo", [addon]);
     const catalog = createCatalog();
     const persist = attachPersist(catalog, store, deferredClock());
     persist.loadFromWorld();
@@ -76,7 +76,7 @@ describe("attachPersist", () => {
       outputs: [{ item: "minecraft:stick", count: 4 }],
     });
     catalog.snapshotVanilla();
-    writeSource(store, "demo", "fp-demo", [
+    writeSource(store, "demo", "recipe", "fp-demo", [
       {
         id: "minecraft:stick",
         stations: ["minecraft:crafting_table"],
@@ -91,13 +91,13 @@ describe("attachPersist", () => {
     clock.advance(SYNC_GRACE_TICKS);
     expect(catalog.get("demo:fiber_block_from_fiber")).toBeUndefined();
     expect(catalog.get("minecraft:stick")!.outputs).toEqual([{ item: "minecraft:stick", count: 4 }]);
-    expect(store.getDynamicPropertyIds().some((id) => id.includes("reciperegistry:src:demo"))).toBe(false);
+    expect(store.getDynamicPropertyIds().some((id) => id.includes("bedrockregistry:src:demo"))).toBe(false);
   });
 
   it("keeps a source that syncs before grace", () => {
     const store = memoryStore();
     const clock = deferredClock();
-    writeSource(store, "demo", "fp-demo", [addon]);
+    writeSource(store, "demo", "recipe", "fp-demo", [addon]);
     const catalog = createCatalog();
     const persist = attachPersist(catalog, store, clock);
     persist.loadFromWorld();
@@ -109,7 +109,7 @@ describe("attachPersist", () => {
   it("loadFromWorldJob overlays one source per yield then starts grace", () => {
     const store = memoryStore();
     const clock = deferredClock();
-    writeSource(store, "demo", "fp-demo", [addon]);
+    writeSource(store, "demo", "recipe", "fp-demo", [addon]);
     const catalog = createCatalog();
     const persist = attachPersist(catalog, store, clock);
     const job = persist.loadFromWorldJob();
@@ -133,7 +133,7 @@ describe("attachPersist", () => {
     expect(readSource(store, "demo")).toBeUndefined();
     clock.advance(1);
     expect(readSource(store, "demo")?.fp).toBe("fp-demo");
-    expect(readSource(store, "demo")?.recipes).toEqual([addon]);
+    expect(readSource(store, "demo")?.documents).toEqual([addon]);
   });
 
   it("save coalesces one source to the last fp and writes one source per tick", () => {
@@ -159,7 +159,7 @@ describe("attachPersist", () => {
     const store = memoryStore();
     const clock = deferredClock();
     const catalog = createCatalog();
-    writeSource(store, "demo", "fp-demo", [addon]);
+    writeSource(store, "demo", "recipe", "fp-demo", [addon]);
     catalog.replaceSource("demo", [addon]);
     const persist = attachPersist(catalog, store, clock);
     persist.save("demo", "fp-next");
@@ -172,7 +172,7 @@ describe("attachPersist", () => {
 
   it("fpOf peeks meta without overlaying recipes", () => {
     const store = memoryStore();
-    writeSource(store, "demo", "fp-demo", [addon]);
+    writeSource(store, "demo", "recipe", "fp-demo", [addon]);
     const catalog = createCatalog();
     const persist = attachPersist(catalog, store, deferredClock());
     expect(persist.fpOf("demo")).toBe("fp-demo");
@@ -182,7 +182,7 @@ describe("attachPersist", () => {
   it("hydrateSource overlays one source and startGrace drops unheard persist keys", () => {
     const store = memoryStore();
     const clock = deferredClock();
-    writeSource(store, "demo", "fp-demo", [addon]);
+    writeSource(store, "demo", "recipe", "fp-demo", [addon]);
     const catalog = createCatalog();
     const persist = attachPersist(catalog, store, clock);
     persist.startGrace();
@@ -191,5 +191,50 @@ describe("attachPersist", () => {
     clock.advance(SYNC_GRACE_TICKS);
     expect(catalog.get("demo:fiber_block_from_fiber")).toBeUndefined();
     expect(readSource(store, "demo")).toBeUndefined();
+  });
+
+  it("does not overlay leftover reciperegistry keys", () => {
+    const store = memoryStore();
+    store.setDynamicProperty("reciperegistry:src:demo:meta", JSON.stringify({ v: 2, fp: "old", chunks: 1 }));
+    store.setDynamicProperty("reciperegistry:src:demo:0", JSON.stringify([addon]));
+    const catalog = createCatalog();
+    const persist = attachPersist(catalog, store, deferredClock());
+    persist.loadFromWorld();
+    expect(catalog.get("demo:fiber_block_from_fiber")).toBeUndefined();
+    expect(store.getDynamicProperty("reciperegistry:src:demo:meta")).toBeDefined();
+  });
+
+  it("rewriting items does not rewrite the recipe blob", () => {
+    const store = memoryStore();
+    const clock = deferredClock();
+    const catalog = createCatalog();
+    catalog.replaceSource("demo", [addon], "recipe");
+    catalog.replaceSource("demo", [{ id: "demo:widget" }], "item");
+    const persist = attachPersist(catalog, store, clock);
+    persist.save("demo", "fp-recipe", "recipe");
+    persist.save("demo", "fp-item", "item");
+    clock.advance(1);
+    clock.advance(1);
+    expect(readSource(store, "demo", "recipe")?.fp).toBe("fp-recipe");
+    catalog.replaceSource("demo", [{ id: "demo:widget", extra: { n: 2 } }], "item");
+    persist.save("demo", "fp-item-2", "item");
+    clock.advance(1);
+    expect(readSource(store, "demo", "recipe")?.fp).toBe("fp-recipe");
+    expect(readSource(store, "demo", "item")?.fp).toBe("fp-item-2");
+  });
+
+  it("grace drops every kind of an unheard source", () => {
+    const store = memoryStore();
+    const clock = deferredClock();
+    writeSource(store, "demo", "recipe", "fp-recipe", [addon]);
+    writeSource(store, "demo", "item", "fp-item", [{ id: "demo:widget" }]);
+    const catalog = createCatalog();
+    const persist = attachPersist(catalog, store, clock);
+    persist.loadFromWorld();
+    expect(catalog.getDocument("item", "demo:widget")).toEqual({ id: "demo:widget" });
+    clock.advance(SYNC_GRACE_TICKS);
+    expect(catalog.get("demo:fiber_block_from_fiber")).toBeUndefined();
+    expect(catalog.getDocument("item", "demo:widget")).toBeUndefined();
+    expect(listPersistedSources(store)).toEqual([]);
   });
 });

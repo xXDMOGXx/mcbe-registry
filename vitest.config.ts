@@ -8,7 +8,6 @@ export default defineConfig({
   resolve: {
     alias: {
       "@minecraft/server": path.join(root, "test/minecraft-server-stub.ts"),
-      "@mcbab/minecraft-server-fake": path.join(root, "test/minecraft-server-stub.ts"),
       "mcbe-ipc": path.join(root, "test/mcbe-ipc-stub.ts"),
     },
   },
@@ -17,7 +16,7 @@ export default defineConfig({
     environment: "node",
     server: {
       deps: {
-        inline: ["@mcbe-reciperegistry/client", "mcbe-ipc"],
+        inline: ["@mcbe-registry/client", "mcbe-ipc"],
       },
     },
   },

@@ -1,14 +1,18 @@
-/** Script-event ids for JSON discovery (`hello` / `ready`). */
+/** Script-event ids for JSON discovery (`hello` / `ready`) and host claim. */
 export const EVENT = {
-  ready: "reciperegistry:ready",
-  hello: "reciperegistry:hello",
+  ready: "bedrockregistry:ready",
+  hello: "bedrockregistry:hello",
+  claim: "bedrockregistry:claim",
 } as const;
 
 /** Object form of an ingredient when shorthand is not enough. */
 export interface IngredientObject {
   item?: string;
   tag?: string;
+  fluid?: string;
+  gas?: string;
   count?: number;
+  amount?: number;
   slot?: string;
   /** Tags the query item has; ignored on stored recipes. */
   tags?: string[];
@@ -49,6 +53,8 @@ export interface ListFilter {
   output?: string;
   /** Item id a recipe lists as `leftover`. */
   leftover?: string;
+  /** Item, fluid, or gas id a recipe lists in `inputs`. */
+  input?: string;
 }
 
 /** Yield of a match: outputs plus optional leftover/duration/energy/extra/type — no recipe id. */
@@ -72,14 +78,14 @@ export interface MatchQuery {
   inputs?: Ingredient[];
 }
 
-/** `reciperegistry:ready` body. `minecraft` is the vanilla snapshot version, not the running client. */
+/** `bedrockregistry:ready` body. `minecraft` is the vanilla snapshot version, not the running client. */
 export interface ReadyEnvelope {
   v: number;
   schema: number;
   minecraft?: string;
 }
 
-/** `reciperegistry:hello` body. */
+/** `bedrockregistry:hello` body. */
 export interface HelloEnvelope {
   v: number;
 }

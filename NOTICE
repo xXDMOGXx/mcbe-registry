@@ -1,9 +1,12 @@
-Vanilla recipe and item-tag snapshot
-====================================
+Vanilla recipe, item/block-tag, and loot snapshot
+==========================================
 
-`src/vanillaCatalog.ts` and `src/vanillaItemTags.ts` contain Minecraft Bedrock
-recipe and item-tag data derived from Mojang's public bedrock-samples /
-vanilla-tags dumps (see `VANILLA_CATALOG_MINECRAFT` in vanillaCatalog.ts).
+`src/vanillaCatalog.ts`, `src/vanillaItemTags.ts`, `src/vanillaBlockTags.ts`,
+`src/vanillaLoot.ts`, and the engine-gap dump modules (`src/vanillaItemTagDump.ts`,
+`src/vanillaBlockTagDump.ts`, `src/vanillaLootDump.ts`)
+contain Minecraft Bedrock recipe, tag, and loot data derived from Mojang's public
+bedrock-samples / vanilla-tags dumps and from in-engine reads of the same game
+(see `VANILLA_CATALOG_MINECRAFT` in vanillaCatalog.ts).
 
 That data is © Mojang Studios. It is included for interoperability with the
 public game. It is **not** licensed under the MIT License that covers the rest

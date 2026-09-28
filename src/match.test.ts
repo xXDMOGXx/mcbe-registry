@@ -202,6 +202,22 @@ describe("matchingRecipes", () => {
     ).toBeUndefined();
   });
 
+  it("matches a fluid bag by id and amount, not the vessel item", () => {
+    const recipe: Recipe = {
+      id: "m:wet",
+      stations: ["m:tank"],
+      inputs: [{ fluid: "minecraft:water", amount: 3000 }],
+      outputs: ["minecraft:wet_sponge"],
+    };
+    expect(
+      matchRecipes([recipe], { station: "m:tank", inputs: [{ fluid: "minecraft:water", amount: 3000 }] })?.id,
+    ).toBe("m:wet");
+    expect(matchRecipes([recipe], { station: "m:tank", inputs: ["minecraft:water_bucket"] })).toBeUndefined();
+    expect(
+      matchRecipes([recipe], { station: "m:tank", inputs: [{ fluid: "minecraft:water", amount: 1000 }] }),
+    ).toBeUndefined();
+  });
+
   it("matches cake using a brown egg via the egg tag", () => {
     const hit = matchRecipes(
       VANILLA_RECIPES,

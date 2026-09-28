@@ -1,5 +1,7 @@
-Vanilla recipe and item-tag snapshot
+Vanilla recipe, item-tag, and loot snapshot
 ====================================
 
 See the pack-root `NOTICE`. This file sits next to `vanillaCatalog.ts` /
-`vanillaItemTags.ts` so a catalog-only copy still carries the Mojang label.
+`vanillaItemTags.ts` / `vanillaBlockTags.ts` / `vanillaLoot.ts` /
+`vanillaItemTagDump.ts` / `vanillaBlockTagDump.ts` / `vanillaLootDump.ts`
+so a catalog-only copy still carries the Mojang label.

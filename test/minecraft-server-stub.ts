@@ -1,6 +1,5 @@
 /**
- * Runtime stub so Vitest can resolve `@minecraft/server` and
- * `@mcbab/minecraft-server-fake` (types-only / MCBAB-only on npm).
+ * Runtime stub so public-repo Vitest can resolve `@minecraft/server`.
  */
 type Callback = () => void;
 
@@ -18,6 +17,45 @@ type Emitter = {
   unsubscribe(callback: (event: unknown) => void): void;
   __dispatch(event: unknown): void;
 };
+
+/** Types-only stand-in so Vitest can resolve the specifier. */
+export class ItemStack {
+  constructor(
+    readonly typeId: string,
+    readonly amount = 1,
+  ) {}
+  getTags(): string[] {
+    return [];
+  }
+}
+
+let fakeBlockTypes: { id: string }[] = [];
+let fakeItemTypes: { id: string }[] = [];
+let fakeEntityTypes: { id: string }[] = [];
+let fakeGenerateLootFromBlockType: (blockTypeId: string, toolTypeId: string | undefined) => ItemStack[] | undefined =
+  () => undefined;
+let fakeGenerateLootFromEntityType: (entityTypeId: string, toolTypeId: string | undefined) => ItemStack[] | undefined =
+  () => undefined;
+
+function resetFakeTypeCatalogs(): void {
+  fakeBlockTypes = [];
+  fakeItemTypes = [];
+  fakeEntityTypes = [];
+}
+
+function resetFakeLootGenerate(): void {
+  fakeGenerateLootFromBlockType = () => undefined;
+  fakeGenerateLootFromEntityType = () => undefined;
+}
+
+/** Test-only: `generateLootFromBlockType` / `generateLootFromEntityType` return values. */
+export function setFakeGenerateLoot(hooks: {
+  fromBlock?: (blockTypeId: string, toolTypeId: string | undefined) => ItemStack[] | undefined;
+  fromEntity?: (entityTypeId: string, toolTypeId: string | undefined) => ItemStack[] | undefined;
+}): void {
+  if (hooks.fromBlock !== undefined) fakeGenerateLootFromBlockType = hooks.fromBlock;
+  if (hooks.fromEntity !== undefined) fakeGenerateLootFromEntityType = hooks.fromEntity;
+}
 
 function createEmitter(): Emitter {
   const callbacks = new Set<(event: unknown) => void>();
@@ -167,6 +205,19 @@ function createFakeWorld() {
       return [...props.keys()];
     },
     sendMessage(_message: unknown) {},
+    getLootTableManager() {
+      return {
+        getLootTable(_path: string) {
+          return undefined;
+        },
+        generateLootFromBlockType(scriptBlockType: { id: string }, tool?: ItemStack) {
+          return fakeGenerateLootFromBlockType(scriptBlockType.id, tool?.typeId);
+        },
+        generateLootFromEntityType(entityType: { id: string }, tool?: ItemStack) {
+          return fakeGenerateLootFromEntityType(entityType.id, tool?.typeId);
+        },
+      };
+    },
     _reset() {
       props.clear();
     },
@@ -179,11 +230,56 @@ export const system = createFakeSystem();
 /** Shared fake `world` for aliased `@minecraft/server` imports. */
 export const world = createFakeWorld();
 
-/** Clears scheduled jobs and world DPs. */
+/** Clears scheduled jobs, world DPs, and loot/type catalogs. */
 export function resetMinecraftServerFake(): void {
   system._reset();
   world._reset();
+  resetFakeTypeCatalogs();
+  resetFakeLootGenerate();
 }
 
-/** Types-only stand-in so Vitest can resolve the specifier. */
-export class ItemStack {}
+/** Minimal `BlockPermutation.resolve` for the engine dump. */
+export const BlockPermutation = {
+  resolve(typeId: string) {
+    return { type: { id: typeId }, getTags: () => [] as string[] };
+  },
+};
+
+/** Minimal `BlockTypes`. */
+export const BlockTypes = {
+  get(typeId: string) {
+    return fakeBlockTypes.find((row) => row.id === typeId) ?? { id: typeId };
+  },
+  getAll() {
+    return [...fakeBlockTypes];
+  },
+  _setAll(ids: readonly string[]): void {
+    fakeBlockTypes = ids.map((id) => ({ id }));
+  },
+};
+
+/** Minimal `ItemTypes`. */
+export const ItemTypes = {
+  get(itemId: string) {
+    return fakeItemTypes.find((row) => row.id === itemId) ?? { id: itemId };
+  },
+  getAll() {
+    return [...fakeItemTypes];
+  },
+  _setAll(ids: readonly string[]): void {
+    fakeItemTypes = ids.map((id) => ({ id }));
+  },
+};
+
+/** Minimal `EntityTypes`. */
+export const EntityTypes = {
+  get(identifier: string) {
+    return fakeEntityTypes.find((row) => row.id === identifier) ?? { id: identifier };
+  },
+  getAll() {
+    return [...fakeEntityTypes];
+  },
+  _setAll(ids: readonly string[]): void {
+    fakeEntityTypes = ids.map((id) => ({ id }));
+  },
+};

@@ -1,8 +1,10 @@
+import { DEFAULT_REGISTRY_KIND, REGISTRY_KINDS } from "@mcbe-registry/client/kinds";
 import type { Catalog } from "./catalog.js";
 import {
   SYNC_GRACE_TICKS,
   deleteSource,
-  listPersistedSources,
+  deleteSourceKind,
+  listPersistedBlobs,
   loadAllSources,
   readSource,
   readSourceFingerprint,
@@ -10,36 +12,50 @@ import {
   type DynamicPropertyStore,
 } from "./sourceStore.js";
 
-/** World-persist hooks the schema-3 IPC host uses after vanilla load. */
+function blobKey(source: string, kind: string): string {
+  return `${source}\0${kind}`;
+}
+
+function parseBlobKey(key: string): { source: string; kind: string } {
+  const split = key.indexOf("\0");
+  return { source: key.slice(0, split), kind: key.slice(split + 1) };
+}
+
+/** World-persist hooks the IPC host uses after vanilla load. */
 export interface PersistHooks {
-  /** Stored fingerprint for `source`, if that pack is persisted. */
-  fpOf(source: string): string | undefined;
+  /** Stored fingerprint for `(source, kind)`, if that blob is persisted. */
+  fpOf(source: string, kind?: string): string | undefined;
   /** Updates RAM `fp` now; queues a world-DP rewrite for a later tick. */
-  save(source: string, fp: string): void;
-  /** Drops that source from RAM, the persist queue, and world properties. */
+  save(source: string, fp: string, kind?: string): void;
+  /** Drops that source from RAM, the persist queue, and world properties (all kinds). */
   drop(source: string): void;
   /** Marks `source` as seen this session so the grace timer will not drop it. */
   heard(source: string): void;
-  /** Overlays persisted blobs for `source` into the catalog. False if blobs are missing. */
-  hydrateSource(source: string): boolean;
+  /** Overlays persisted blobs for `(source, kind)` into the catalog. False if blobs are missing. */
+  hydrateSource(source: string, kind?: string): boolean;
 }
 
 /** Session persist handle the IPC host uses after vanilla load. */
 export interface PersistSession extends PersistHooks {
   /** Overlays persisted sources from world DPs and starts the unsynced-source grace timer. */
   loadFromWorld(): void;
-  /** One persisted source per yield, then starts grace. */
+  /** One persisted blob per yield, then starts grace. */
   loadFromWorldJob(): Generator<void, void, void>;
   /** Starts the unsynced-source grace timer (no overlay). */
   startGrace(): void;
-  /** Persisted sources currently in RAM: `{ source, fp, size }`. */
-  sources(): { source: string; fp: string; size: number }[];
+  /** Persisted blobs currently in RAM: `{ source, kind, fp, size }`. */
+  sources(): { source: string; kind: string; fp: string; size: number }[];
 }
 
 /** Injected clock for grace and deferred persist DP writes. */
 export interface PersistClock {
   /** Schedules `callback` after `ticks` (Bedrock `system.runTimeout`). */
   runTimeout(callback: () => void, ticks: number): void;
+}
+
+/** Optional notify after a source is dropped from RAM and world DPs. */
+export interface PersistDropHooks {
+  onDropped?(source: string, kinds: string[]): void;
 }
 
 /**
@@ -50,6 +66,7 @@ export function attachPersist(
   catalog: Catalog,
   store: DynamicPropertyStore,
   clock: PersistClock,
+  dropHooks?: PersistDropHooks,
 ): PersistSession {
   const fingerprints = new Map<string, string>();
   const heardSources = new Set<string>();
@@ -57,50 +74,66 @@ export function attachPersist(
   const queued = new Map<string, string | undefined>();
   let drainScheduled = false;
 
-  function applyLoaded(source: string): boolean {
-    if (catalog.recipesForSource(source).length > 0) return true;
-    const loaded = readSource(store, source);
+  function applyLoaded(source: string, kind: string): boolean {
+    if (catalog.documentsForSource(source, kind).length > 0) return true;
+    const loaded = readSource(store, source, kind);
     if (loaded === undefined) return false;
-    catalog.replaceSource(loaded.source, loaded.recipes);
-    fingerprints.set(loaded.source, loaded.fp);
+    catalog.replaceSource(loaded.source, loaded.documents, loaded.kind);
+    fingerprints.set(blobKey(loaded.source, loaded.kind), loaded.fp);
     return true;
+  }
+
+  function kindsOwned(source: string): string[] {
+    const kinds: string[] = [];
+    for (const kind of REGISTRY_KINDS) {
+      if (catalog.documentsForSource(source, kind).length > 0) kinds.push(kind);
+    }
+    return kinds;
   }
 
   function startGrace(): void {
     clock.runTimeout(() => {
-      for (const source of listPersistedSources(store)) {
-        if (heardSources.has(source)) continue;
-        queued.delete(source);
+      const blobs = listPersistedBlobs(store);
+      const unheard = new Set<string>();
+      for (const blob of blobs) {
+        if (heardSources.has(blob.source)) continue;
+        unheard.add(blob.source);
+        queued.delete(blobKey(blob.source, blob.kind));
+        fingerprints.delete(blobKey(blob.source, blob.kind));
+      }
+      for (const source of unheard) {
+        const kinds = kindsOwned(source);
         catalog.dropSource(source);
         deleteSource(store, source);
-        fingerprints.delete(source);
+        dropHooks?.onDropped?.(source, kinds);
       }
     }, SYNC_GRACE_TICKS);
   }
 
-  /** Queues a DP write or delete and schedules a one-source drain if idle. */
-  function enqueue(source: string, fp: string | undefined): void {
-    queued.set(source, fp);
+  /** Queues a DP write or delete and schedules a one-blob drain if idle. */
+  function enqueue(source: string, kind: string, fp: string | undefined): void {
+    queued.set(blobKey(source, kind), fp);
     if (drainScheduled) return;
     drainScheduled = true;
     clock.runTimeout(flushOne, 1);
   }
 
-  /** Writes or deletes the next queued source, then reschedules if more remain. */
+  /** Writes or deletes the next queued blob, then reschedules if more remain. */
   function flushOne(): void {
     const next = queued.entries().next();
     if (next.done) {
       drainScheduled = false;
       return;
     }
-    const [source, fp] = next.value;
-    queued.delete(source);
-    const recipes = catalog.recipesForSource(source);
-    if (fp === undefined || recipes.length === 0) {
-      deleteSource(store, source);
-      fingerprints.delete(source);
+    const [key, fp] = next.value;
+    queued.delete(key);
+    const { source, kind } = parseBlobKey(key);
+    const documents = catalog.documentsForSource(source, kind);
+    if (fp === undefined || documents.length === 0) {
+      deleteSourceKind(store, source, kind);
+      fingerprints.delete(key);
     } else {
-      writeSource(store, source, fp, recipes);
+      writeSource(store, source, kind, fp, documents);
     }
     if (queued.size > 0) clock.runTimeout(flushOne, 1);
     else drainScheduled = false;
@@ -109,49 +142,57 @@ export function attachPersist(
   return {
     loadFromWorld() {
       for (const loaded of loadAllSources(store)) {
-        catalog.replaceSource(loaded.source, loaded.recipes);
-        fingerprints.set(loaded.source, loaded.fp);
+        catalog.replaceSource(loaded.source, loaded.documents, loaded.kind);
+        fingerprints.set(blobKey(loaded.source, loaded.kind), loaded.fp);
       }
       startGrace();
     },
     *loadFromWorldJob(): Generator<void, void, void> {
-      for (const source of listPersistedSources(store)) {
-        applyLoaded(source);
+      for (const blob of listPersistedBlobs(store)) {
+        applyLoaded(blob.source, blob.kind);
         yield;
       }
       startGrace();
     },
     startGrace,
-    fpOf(source) {
-      return fingerprints.get(source) ?? readSourceFingerprint(store, source);
+    fpOf(source, kind = DEFAULT_REGISTRY_KIND) {
+      return fingerprints.get(blobKey(source, kind)) ?? readSourceFingerprint(store, source, kind);
     },
-    hydrateSource(source) {
-      return applyLoaded(source);
+    hydrateSource(source, kind = DEFAULT_REGISTRY_KIND) {
+      return applyLoaded(source, kind);
     },
-    save(source, fp) {
-      const recipes = catalog.recipesForSource(source);
-      if (recipes.length === 0) {
-        fingerprints.delete(source);
-        enqueue(source, undefined);
+    save(source, fp, kind = DEFAULT_REGISTRY_KIND) {
+      const documents = catalog.documentsForSource(source, kind);
+      const key = blobKey(source, kind);
+      if (documents.length === 0) {
+        fingerprints.delete(key);
+        enqueue(source, kind, undefined);
         return;
       }
-      fingerprints.set(source, fp);
-      enqueue(source, fp);
+      fingerprints.set(key, fp);
+      enqueue(source, kind, fp);
     },
     drop(source) {
-      queued.delete(source);
+      const kinds = kindsOwned(source);
+      for (const key of [...queued.keys()]) {
+        if (parseBlobKey(key).source === source) queued.delete(key);
+      }
       heardSources.delete(source);
       catalog.dropSource(source);
       deleteSource(store, source);
-      fingerprints.delete(source);
+      for (const key of [...fingerprints.keys()]) {
+        if (parseBlobKey(key).source === source) fingerprints.delete(key);
+      }
+      dropHooks?.onDropped?.(source, kinds);
     },
     heard(source) {
       heardSources.add(source);
     },
     sources() {
-      const rows: { source: string; fp: string; size: number }[] = [];
-      for (const [source, fp] of fingerprints) {
-        rows.push({ source, fp, size: catalog.recipesForSource(source).length });
+      const rows: { source: string; kind: string; fp: string; size: number }[] = [];
+      for (const [key, fp] of fingerprints) {
+        const { source, kind } = parseBlobKey(key);
+        rows.push({ source, kind, fp, size: catalog.documentsForSource(source, kind).length });
       }
       return rows;
     },

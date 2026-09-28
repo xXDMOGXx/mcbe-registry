@@ -1,11 +1,11 @@
 /**
- * Script-only Recipe Registry BP (manifest + esbuild). Does not import `@mcbab/build`.
+ * Script-only Bedrock Registry BP (manifest + esbuild). Does not import `@mcbab/build`.
  */
 import * as esbuild from "esbuild";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { PACK_LOCALE, packListLang, recipeRegistryManifest } from "./packManifest.js";
+import { PACK_LOCALE, packListLang, bedrockRegistryManifest } from "./packManifest.js";
 
 const packRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DEV_DEPLOY_ENV_VAR = "MCBAB_DEV_DEPLOY_PATH";
@@ -47,8 +47,8 @@ function copyDir(src: string, dest: string): void {
   fs.cpSync(src, dest, { recursive: true });
 }
 
-/** Writes `dist/BP` for Recipe Registry. */
-export async function buildRecipeRegistryPack(modDir = packRoot): Promise<string> {
+/** Writes `dist/BP` for Bedrock Registry. */
+export async function buildBedrockRegistryPack(modDir = packRoot): Promise<string> {
   const pkg = JSON.parse(fs.readFileSync(path.join(modDir, "package.json"), "utf8")) as { version: string };
   const version = pkg.version;
   const bpDir = path.join(modDir, "dist", "BP");
@@ -70,7 +70,7 @@ export async function buildRecipeRegistryPack(modDir = packRoot): Promise<string
 
   fs.writeFileSync(
     path.join(bpDir, "manifest.json"),
-    `${JSON.stringify(recipeRegistryManifest(version), null, 2)}\n`,
+    `${JSON.stringify(bedrockRegistryManifest(version), null, 2)}\n`,
   );
   const lang = packListLang(version);
   fs.writeFileSync(path.join(bpDir, "texts", "languages.json"), `${JSON.stringify([PACK_LOCALE], null, 2)}\n`);
@@ -96,7 +96,7 @@ const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolv
 if (isMain) {
   const deploy = process.argv.includes("--dev");
   if (deploy) loadDotEnv(packRoot);
-  buildRecipeRegistryPack(packRoot)
+  buildBedrockRegistryPack(packRoot)
     .then(() => {
       if (deploy) deployDev(packRoot, process.env[DEV_DEPLOY_ENV_VAR]);
     })

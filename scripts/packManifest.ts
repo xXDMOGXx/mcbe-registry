@@ -18,11 +18,11 @@ export function parsePackSemver(version: string): [number, number, number] {
 
 /** Pack-list `.lang` body (`{version}` already substituted). */
 export function packListLang(version: string): string {
-  return `pack.name=Recipe Registry\npack.description=Central registry that documents and relays all valid recipes. v${version} by xxdmogxx\n`;
+  return `pack.name=Bedrock Registry\npack.description=Central registry that documents and relays recipes, items, blocks, fluids, tags, and loot. v${version} by xxdmogxx\n`;
 }
 
 /** BP `manifest.json` object for this host pack. */
-export function recipeRegistryManifest(version: string): Record<string, unknown> {
+export function bedrockRegistryManifest(version: string): Record<string, unknown> {
   const semver = parsePackSemver(version);
   return {
     format_version: 2,
