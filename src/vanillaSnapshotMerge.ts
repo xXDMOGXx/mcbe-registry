@@ -1,5 +1,6 @@
 import type { LootDocument, LootEntry } from "@mcbe-registry/client";
 import type { TagIndex } from "./match.js";
+import type { Recipe } from "./protocol.js";
 
 /** Empty-hand harvest token; same string as client `LOOT_TOOL_NONE`. */
 const HARVEST_NONE = "none";
@@ -108,6 +109,22 @@ export function mergeGapBlockLoot(docs: readonly LootDocument[]): LootDocument[]
     entries: group.entries,
   }));
   return [...pass, ...blocks].sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/** Samples recipes first; dump rows only when that id has no JSON recipe. */
+export function mergeRecipesJsonThenDump(json: readonly Recipe[], dump: readonly Recipe[]): Recipe[] {
+  const seen = new Set<string>();
+  const out: Recipe[] = [];
+  for (const row of json) {
+    seen.add(row.id);
+    out.push(row);
+  }
+  for (const row of dump) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    out.push(row);
+  }
+  return out;
 }
 
 /** Samples loot documents first; dump rows only when that id has no JSON table. */

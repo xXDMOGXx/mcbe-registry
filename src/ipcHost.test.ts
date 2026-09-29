@@ -20,6 +20,8 @@ import {
   CHANNEL,
   createClient,
   encodeRecipe,
+  overlayListFields,
+  documentFromOverlayGet,
   PROTOCOL_SCHEMA,
   HOST_NEEDS_UPDATE_WARN,
   resetCompatibilityWarns,
@@ -65,7 +67,7 @@ function fakeIpc(): PeerIpc & { sent: { channel: string; value: unknown }[] } {
 describe("attachIpcHost", () => {
   beforeEach(() => resetCompatibilityWarns());
 
-  it("serves match and result over schema-4 IPC", async () => {
+  it("serves match and result over schema-5 IPC", async () => {
     const catalog = createCatalog();
     const recipe: Recipe = {
       id: "mymod:crush_cobble",
@@ -277,7 +279,7 @@ describe("attachIpcHost", () => {
         kind: "item",
         fp: "fp-item",
         recipes: [],
-        documents: [JSON.stringify({ id: "demo:widget", extra: { a: 1 } })],
+        ...overlayListFields("item", [{ id: "demo:widget", extra: { a: 1 } }]),
       },
       Proto.OkReply,
     );
@@ -294,7 +296,10 @@ describe("attachIpcHost", () => {
     ).resolves.toEqual({ ok: true });
     expect(catalog.getDocument("item", "demo:widget")).toEqual({ id: "demo:widget", extra: { a: 1 } });
     const got = await ipc.invoke(CHANNEL.get, Proto.GetAsk, { kind: "item", id: "demo:widget" }, Proto.GetReply);
-    expect(JSON.parse((got as { document: string }).document)).toEqual({ id: "demo:widget", extra: { a: 1 } });
+    expect(documentFromOverlayGet("item", got as { item?: { id: string } })).toEqual({
+      id: "demo:widget",
+      extra: { a: 1 },
+    });
   });
 
   it("session register without source writes no persist keys", async () => {
@@ -318,7 +323,7 @@ describe("attachIpcHost", () => {
     await ipc.invoke(
       CHANNEL.register,
       Proto.RegisterAsk,
-      { recipes: [], documents: [JSON.stringify({ id: "demo:session" })], kind: "item" },
+      { recipes: [], ...overlayListFields("item", [{ id: "demo:session" }]), kind: "item" },
       Proto.OkReply,
     );
     expect(catalog.getDocument("item", "demo:session")).toEqual({ id: "demo:session" });
@@ -345,13 +350,13 @@ describe("attachIpcHost", () => {
         {
           kind: "fluid",
           recipes: [],
-          documents: [
-            JSON.stringify({
+          ...overlayListFields("fluid", [
+            {
               id: "addon:latex",
               kind: "liquid",
               vessels: [{ filled: "addon:latex_bottle", empty: "minecraft:glass_bottle", amount: 333.3 }],
-            }),
-          ],
+            },
+          ]),
         },
         Proto.OkReply,
       ),
@@ -360,7 +365,7 @@ describe("attachIpcHost", () => {
     expect(ipc.sent).toEqual([]);
   });
 
-  it("rejects non-integer loot chance", async () => {
+  it("rejects loot chance outside 0–100", async () => {
     const catalog = createCatalog();
     const ipc = fakeIpc();
     attachIpcHost({ ipc, catalog });
@@ -371,18 +376,47 @@ describe("attachIpcHost", () => {
         {
           kind: "loot",
           recipes: [],
-          documents: [
-            JSON.stringify({
+          ...overlayListFields("loot", [
+            {
               id: "addon:drops",
               entity: "addon:mob",
-              entries: [{ item: "minecraft:stick", chance: 12.5 }],
-            }),
-          ],
+              entries: [{ item: "minecraft:stick", chance: 1000 }],
+            },
+          ]),
         },
         Proto.OkReply,
       ),
     ).resolves.toEqual({ ok: false, err: "bad" });
     expect(catalog.getDocument("loot", "addon:drops")).toBeUndefined();
+  });
+
+  it("registers loot chance 12.5 percent", async () => {
+    const catalog = createCatalog();
+    const ipc = fakeIpc();
+    attachIpcHost({ ipc, catalog });
+    await expect(
+      ipc.invoke(
+        CHANNEL.register,
+        Proto.RegisterAsk,
+        {
+          kind: "loot",
+          recipes: [],
+          ...overlayListFields("loot", [
+            {
+              id: "addon:drops",
+              entity: "addon:mob",
+              entries: [{ item: "minecraft:stick", chance: 12.5 }],
+            },
+          ]),
+        },
+        Proto.OkReply,
+      ),
+    ).resolves.toEqual({ ok: true });
+    expect(catalog.getDocument("loot", "addon:drops")).toEqual({
+      id: "addon:drops",
+      entity: "addon:mob",
+      entries: [{ item: "minecraft:stick", chance: 12.5 }],
+    });
   });
 
   it("lists loot by harvest tool", async () => {
@@ -400,9 +434,9 @@ describe("attachIpcHost", () => {
       Proto.ListFilter,
       { kind: "loot", tool: "minecraft:iron_pickaxe" },
       Proto.ListReply,
-    )) as { documents?: string[] };
-    expect(listed.documents).toHaveLength(1);
-    expect(JSON.parse(listed.documents![0]!)).toMatchObject({
+    )) as { loots?: { id: string; tools?: string[] }[] };
+    expect(listed.loots).toHaveLength(1);
+    expect(listed.loots![0]).toMatchObject({
       id: "addon:ore",
       tools: ["minecraft:iron_pickaxe", "none"],
     });
@@ -426,11 +460,11 @@ describe("attachIpcHost", () => {
     );
     expect(overlay).toEqual({
       entries: [],
-      documents: [
-        JSON.stringify({ id: "mymod:etchant", kind: "liquid", vessels: [{ filled: "a", empty: "b", amount: 1000 }] }),
-        JSON.stringify({ id: "other:latex", kind: "liquid", vessels: [{ filled: "c", empty: "d", amount: 1000 }] }),
-      ],
       sources: ["mymod", "other"],
+      ...overlayListFields("fluid", [
+        { id: "mymod:etchant", kind: "liquid", vessels: [{ filled: "a", empty: "b", amount: 1000 }] },
+        { id: "other:latex", kind: "liquid", vessels: [{ filled: "c", empty: "d", amount: 1000 }] },
+      ]),
     });
     await ipc.invoke(
       CHANNEL.register,
@@ -454,13 +488,13 @@ describe("attachIpcHost", () => {
         kind: "fluid",
         fp: "fp-latex",
         recipes: [],
-        documents: [
-          JSON.stringify({
+        ...overlayListFields("fluid", [
+          {
             id: "other:latex",
             kind: "liquid",
             vessels: [{ filled: "other:latex_bottle", empty: "minecraft:glass_bottle", amount: 1000 }],
-          }),
-        ],
+          },
+        ]),
       },
       Proto.OkReply,
     );

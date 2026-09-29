@@ -183,7 +183,7 @@ function entityLootEntries(stats: Map<string, EntityLootStats>): LootEntry[] {
     if (row === undefined) return { item };
     return {
       item,
-      chance: Math.round((row.hits / ENGINE_DUMP_ENTITY_LOOT_ROLLS) * 1000),
+      chance: Math.round((row.hits / ENGINE_DUMP_ENTITY_LOOT_ROLLS) * 100),
       min: row.min,
       max: row.max,
     };

@@ -24,6 +24,6 @@ npm install @mcbe-registry/client mcbe-ipc
 
 `mcbe-ipc` is [OmniacDev/MCBE-IPC](https://github.com/OmniacDev/MCBE-IPC) (pack-to-pack messaging). A single-file client (`bedrock-registry-client.js`) is on [the client’s GitHub Releases](https://github.com/xXDMOGXx/mcbe-registry-client/releases); save the `mcbe-ipc` pack build next to it as `mcbe-ipc.js`.
 
-**Behavior pack UUID** (manifest `dependencies` entry): `33303c67-a05d-4964-b2c3-ba7c42d8d3b6`
+**Behavior pack UUID** (manifest `dependencies` only if your addon cannot function without the catalog): `33303c67-a05d-4964-b2c3-ba7c42d8d3b6`
 
 Any enabled script can register any document. Ids should be namespaced (`mymod:…`).

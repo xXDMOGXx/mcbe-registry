@@ -7,14 +7,21 @@ import {
   canonicalizeRecipes,
   decodeMatchQuery,
   decodeRecipe,
+  documentsFromOverlayList,
   encodeListEntry,
   encodeMatchResult,
   encodeRecipe,
+  isOverlayKind,
   isRegistryKind,
   noteHostNeedsUpdate,
+  overlayGetFields,
+  overlayListFields,
+  overlayListsEmpty,
   Proto,
+  type OverlayListFields,
   type PeerIpc,
   type Recipe,
+  type RegistryDocument,
 } from "@mcbe-registry/client";
 import type { Catalog } from "./catalog.js";
 import { documentHasBadAmount } from "./catalog.js";
@@ -25,10 +32,13 @@ function isFingerprintPing(payload: {
   source?: string;
   fp?: string;
   recipes: unknown[];
-  documents?: string[];
-}): boolean {
-  const docs = payload.documents ?? [];
-  return payload.source !== undefined && payload.fp !== undefined && payload.recipes.length === 0 && docs.length === 0;
+} & OverlayListFields): boolean {
+  return (
+    payload.source !== undefined &&
+    payload.fp !== undefined &&
+    payload.recipes.length === 0 &&
+    overlayListsEmpty(payload)
+  );
 }
 
 function fingerprintOf(kind: string, documents: readonly unknown[]): string {
@@ -45,21 +55,13 @@ function documentHasStation(document: unknown, station: string): boolean {
   return Array.isArray(stations) && stations.includes(station);
 }
 
-function parseDocuments(raw: string[] | undefined): unknown[] {
-  if (raw === undefined) return [];
-  const out: unknown[] = [];
-  for (const row of raw) {
-    try {
-      out.push(JSON.parse(row) as unknown);
-    } catch {
-      /* skip malformed document */
-    }
-  }
-  return out;
+function overlayDocuments(kind: string, payload: OverlayListFields): RegistryDocument[] {
+  if (!isOverlayKind(kind)) return [];
+  return documentsFromOverlayList(kind, payload);
 }
 
 /**
- * Registers schema-4 MCBE-IPC handlers against `catalog`.
+ * Registers schema-5 MCBE-IPC handlers against `catalog`.
  * Returns an unsubscribe that removes every handler.
  */
 export function attachIpcHost(options: {
@@ -120,7 +122,7 @@ export function attachIpcHost(options: {
       }
 
       const documents =
-        kind === DEFAULT_REGISTRY_KIND ? payload.recipes.map(decodeRecipe) : parseDocuments(payload.documents);
+        kind === DEFAULT_REGISTRY_KIND ? payload.recipes.map(decodeRecipe) : overlayDocuments(kind, payload);
       for (const document of documents) {
         if (documentHasBadAmount(kind, document)) return { ok: false, err: "bad" };
       }
@@ -191,19 +193,18 @@ export function attachIpcHost(options: {
   );
 
   unsubs.push(
-    options.ipc.handle(CHANNEL.get, Proto.GetAsk, Proto.GetReply, (body) => {
+    options.ipc.handle(CHANNEL.get, Proto.GetAsk, Proto.GetReply, ((body: { kind: string | undefined; id: string }) => {
       const kind = body.kind ?? DEFAULT_REGISTRY_KIND;
-      let recipe: ReturnType<typeof encodeRecipe> | undefined;
-      let document: string | undefined;
       if (isRegistryKind(kind) && kind === DEFAULT_REGISTRY_KIND) {
         const stored = options.catalog.get(body.id);
-        if (stored !== undefined) recipe = encodeRecipe(stored);
-      } else if (isRegistryKind(kind)) {
-        const stored = options.catalog.getDocument(kind, body.id);
-        if (stored !== undefined) document = JSON.stringify(stored);
+        return { recipe: stored !== undefined ? encodeRecipe(stored) : undefined };
       }
-      return { recipe, document };
-    }),
+      if (isOverlayKind(kind)) {
+        const stored = options.catalog.getDocument(kind, body.id);
+        return stored !== undefined ? overlayGetFields(kind, stored) : {};
+      }
+      return {};
+    }) as never),
   );
 
   unsubs.push(
@@ -228,12 +229,12 @@ export function attachIpcHost(options: {
       gas: string | undefined;
     }) => {
       const kind = body.kind ?? DEFAULT_REGISTRY_KIND;
-      if (!isRegistryKind(kind)) return { entries: [], documents: undefined, sources: undefined };
+      if (!isRegistryKind(kind)) return { entries: [], sources: undefined };
       const overlay = body.vanilla === false || body.source !== undefined;
       if (overlay) {
         const names =
           body.source !== undefined ? (isValidSource(body.source) ? [body.source] : []) : options.catalog.overlaySources(kind);
-        const documents: string[] = [];
+        const documents: RegistryDocument[] = [];
         const sources: string[] = [];
         for (const source of names) {
           let docs = options.catalog.documentsForSource(source, kind);
@@ -241,11 +242,15 @@ export function attachIpcHost(options: {
             docs = docs.filter((doc) => documentHasStation(doc, body.station as string));
           }
           for (const doc of docs) {
-            documents.push(JSON.stringify(doc));
+            documents.push(doc);
             sources.push(source);
           }
         }
-        return { entries: [], documents, sources };
+        if (kind === DEFAULT_REGISTRY_KIND) {
+          return { entries: [], sources, recipes: documents.map((doc) => encodeRecipe(doc as Recipe)) };
+        }
+        if (!isOverlayKind(kind)) return { entries: [], sources };
+        return { entries: [], sources, ...overlayListFields(kind, documents) };
       }
       const filter = {
         station: body.station,
@@ -264,14 +269,11 @@ export function attachIpcHost(options: {
         fluid: body.fluid,
         gas: body.gas,
       };
-      let entries: ReturnType<typeof encodeListEntry>[] = [];
-      let documents: string[] | undefined;
-      if (kind !== DEFAULT_REGISTRY_KIND) {
-        documents = options.catalog.listDocuments(kind, filter).map((doc) => JSON.stringify(doc));
-      } else {
-        entries = options.catalog.list(filter).map(encodeListEntry);
+      if (isOverlayKind(kind)) {
+        const listed = options.catalog.listDocuments(kind, filter);
+        return { entries: [], sources: undefined, ...overlayListFields(kind, listed) };
       }
-      return { entries, documents, sources: undefined };
+      return { entries: options.catalog.list(filter).map(encodeListEntry), sources: undefined };
     }) as never),
   );
 

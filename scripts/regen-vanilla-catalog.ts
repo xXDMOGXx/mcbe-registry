@@ -6,8 +6,9 @@ import { parseSamplesJson } from "../src/samplesJson.js";
 import { VANILLA_BLOCK_TAG_DUMP } from "../src/vanillaBlockTagDump.js";
 import { VANILLA_ITEM_TAG_DUMP } from "../src/vanillaItemTagDump.js";
 import { VANILLA_LOOT_DUMP } from "../src/vanillaLootDump.js";
+import { VANILLA_RECIPE_DUMP } from "../src/vanillaRecipeDump.js";
 import { loadVanillaLoot, loadVanillaLootJson } from "../src/vanillaLootProject.js";
-import { applyEngineTagDump, mergeTagMaps } from "../src/vanillaSnapshotMerge.js";
+import { applyEngineTagDump, mergeRecipesJsonThenDump, mergeTagMaps } from "../src/vanillaSnapshotMerge.js";
 import { projectVanillaJson } from "../src/vanillaProject.js";
 
 export { parseSamplesJson, stripJsonLineComments } from "../src/samplesJson.js";
@@ -19,7 +20,8 @@ const BLOCK_TAGS_URL = "https://raw.githubusercontent.com/bedrock-dot-dev/vanill
  * Regenerates `src/vanillaCatalog.ts`, `src/vanillaItemTags.ts`,
  * `src/vanillaBlockTags.ts`, `src/vanillaLoot.ts`, and
  * `src/vanillaSamplesCoverage.ts` from a local Mojang `bedrock-samples`
- * tree plus vanilla-tags fetch and committed engine-gap dumps.
+ * tree plus vanilla-tags fetch, committed engine-gap dumps, and
+ * `VANILLA_RECIPE_DUMP`.
  * Looks at `BEDROCK_SAMPLES`, then `../bedrock-samples` next to this repo, then
  * `/home/<user>/dev/bedrock-samples`. CI uses the vendored snapshot; this script
  * does not copy bedrock-samples into the repo.
@@ -201,7 +203,10 @@ export function readMinecraftVersion(root: string): string {
 /** Writes recipe, tag, loot snapshot, and samples-coverage modules from `root`. */
 export async function writeVanillaSnapshot(root: string): Promise<void> {
   const minecraft = readMinecraftVersion(root);
-  const recipes = loadRecipes(path.join(root, "behavior_pack", "recipes"));
+  const recipes = mergeRecipesJsonThenDump(
+    loadRecipes(path.join(root, "behavior_pack", "recipes")),
+    VANILLA_RECIPE_DUMP,
+  );
   const packRoot = path.join(root, "behavior_pack");
   const lootJson = loadVanillaLootJson(packRoot);
   const loot = loadVanillaLoot(packRoot, VANILLA_LOOT_DUMP);

@@ -1,5 +1,5 @@
 /**
- * Live Bedrock Registry host: schema-4 MCBE-IPC, JSON discovery, and per-source persist.
+ * Live Bedrock Registry host: schema-5 MCBE-IPC, JSON discovery, and per-source persist.
  */
 import { system, world } from "@minecraft/server";
 import { peerIpcFromMcbe } from "@mcbe-registry/client/mcbe-ipc";
@@ -19,7 +19,7 @@ import { VANILLA_FLUIDS } from "../src/vanillaFluids.js";
 import { VANILLA_LOOT } from "../src/vanillaLoot.js";
 import { attachVanillaEngineDump } from "./vanillaEngineDump.js";
 
-/** Subscribes to schema-4 IPC + JSON discovery, then hydrates vanilla/overlay and broadcasts `ready`. */
+/** Subscribes to schema-5 IPC + JSON discovery, then hydrates vanilla/overlay and broadcasts `ready`. */
 export function startBedrockRegistryHost(): void {
   attachVanillaEngineDump();
   const catalog = createCatalog({ tags: { item: VANILLA_ITEM_TAGS, block: VANILLA_BLOCK_TAGS } });

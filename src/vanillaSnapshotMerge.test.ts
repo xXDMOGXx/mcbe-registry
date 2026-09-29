@@ -1,5 +1,42 @@
 import { describe, expect, it } from "vitest";
-import { applyEngineTagDump, mergeGapBlockLoot, mergeLootJsonThenDump, mergeTagMaps } from "./vanillaSnapshotMerge.js";
+import { applyEngineTagDump, mergeGapBlockLoot, mergeLootJsonThenDump, mergeRecipesJsonThenDump, mergeTagMaps } from "./vanillaSnapshotMerge.js";
+
+describe("mergeRecipesJsonThenDump", () => {
+  it("keeps samples recipes and appends dump rows only for missing ids", () => {
+    const json = [
+      {
+        id: "minecraft:stick",
+        stations: ["minecraft:crafting_table"],
+        inputs: [{ item: "minecraft:oak_planks", count: 2 }],
+        outputs: [{ item: "minecraft:stick", count: 4 }],
+        type: "shaped",
+        pattern: ["#", "#"],
+        key: { "#": "minecraft:oak_planks" },
+      },
+    ];
+    const dump = [
+      {
+        id: "minecraft:wooden_button",
+        stations: ["minecraft:crafting_table"],
+        inputs: ["minecraft:oak_planks"],
+        outputs: ["minecraft:wooden_button"],
+        type: "shaped",
+        pattern: ["#"],
+        key: { "#": "minecraft:oak_planks" },
+      },
+      {
+        id: "minecraft:stick",
+        stations: ["minecraft:crafting_table"],
+        inputs: ["minecraft:bamboo"],
+        outputs: ["minecraft:stick"],
+        type: "shapeless",
+      },
+    ];
+    const recipes = mergeRecipesJsonThenDump(json, dump);
+    expect(recipes.map((row) => row.id)).toEqual(["minecraft:stick", "minecraft:wooden_button"]);
+    expect(recipes[0]?.type).toBe("shaped");
+  });
+});
 
 describe("mergeLootJsonThenDump", () => {
   it("keeps samples JSON and adds dump rows only for missing ids", () => {

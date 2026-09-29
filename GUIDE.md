@@ -15,7 +15,7 @@ Vanilla Minecraft documents already ship in the host. Do not register those agai
 
 1. The player imports **one** Bedrock Registry behavior pack from [GitHub Releases](https://github.com/xXDMOGXx/mcbe-registry/releases) (the `.mcaddon`) or [CurseForge](https://www.curseforge.com/minecraft-bedrock/addons/bedrock-registry).
 2. Enable **Bedrock Registry** on the world. There is no resource pack.
-3. Your addon lists that pack as a **dependency**.
+3. Your addon lists that pack as a **dependency** only if it cannot function without the catalog.
 
 **Behavior pack UUID:** `33303c67-a05d-4964-b2c3-ba7c42d8d3b6`
 

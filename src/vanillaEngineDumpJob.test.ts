@@ -163,7 +163,7 @@ describe("vanillaEngineDumpJob", () => {
     ]);
   });
 
-  it("writes permille chance and min/max from 100 entity generate rolls", () => {
+  it("writes percent chance and min/max from 100 entity generate rolls", () => {
     let roll = 0;
     const { value } = runJob(
       api({
@@ -183,7 +183,7 @@ describe("vanillaEngineDumpJob", () => {
       {
         id: "minecraft:entities/husk",
         entity: "minecraft:husk",
-        entries: [{ item: "minecraft:rotten_flesh", chance: 500, min: 1, max: 2 }],
+        entries: [{ item: "minecraft:rotten_flesh", chance: 50, min: 1, max: 2 }],
       },
     ]);
   });

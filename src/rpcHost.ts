@@ -13,7 +13,7 @@ export interface RegistryHost {
   broadcastReady(): void;
 }
 
-/** Discovery-only JSON host (`hello` / `ready`). Catalog data ops are schema-4 IPC. */
+/** Discovery-only JSON host (`hello` / `ready`). Catalog data ops are schema-5 IPC. */
 export function createRegistryHost(options: {
   send: HostSend;
   /** Vanilla snapshot Minecraft version announced on `ready`. */

@@ -1,7 +1,7 @@
 {
   "name": "@mcbe-registry/host",
-  "version": "1.0.0",
-  "description": "Bedrock Registry host catalog and script-only Bedrock behavior pack (schema 4). Vanilla snapshots are Mojang data; see NOTICE.",
+  "version": "2.0.0",
+  "description": "Bedrock Registry host catalog and script-only Bedrock behavior pack (schema 5). Vanilla snapshots are Mojang data; see NOTICE.",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",

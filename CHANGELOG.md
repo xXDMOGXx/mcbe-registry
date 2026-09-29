@@ -1,5 +1,19 @@
 # @mcbab-mods/bedrock-registry
 
+## 2.0.0
+
+### Major Changes
+
+- bb31ed6: Schema 5: overlay kinds travel as per-kind PROTO objects (not JSON strings). Loot `chance` is percent 0–100 (`100` = always). Schema-4 clients and hosts no longer match.
+
+### Patch Changes
+
+- Replace the Recipe Registry book icon with a bookshelf-end **BR** pack icon.
+- 3fa7df2: Add engine-gap vanilla crafting recipes (legacy wood buttons/plates/trapdoors/signs/chest boats and stone-type slabs) that Mojang never ships as recipe JSON.
+- Updated dependencies [8ecbc82]
+- Updated dependencies [bb31ed6]
+  - @mcbe-registry/client@2.0.0
+
 ## 1.0.0
 
 ### Major Changes
