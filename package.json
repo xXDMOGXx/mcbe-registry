@@ -32,7 +32,7 @@
     "sample-regen": "tsx scripts/sampleRegen.ts"
   },
   "dependencies": {
-    "@mcbe-registry/client": "^1.0.0",
+    "@mcbe-registry/client": "^2.0.0",
     "mcbe-ipc": "^3.4.2"
   },
   "devDependencies": {
