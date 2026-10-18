@@ -17,11 +17,11 @@ import {
 import { VANILLA_CATALOG_MINECRAFT, VANILLA_RECIPES } from "../src/vanillaCatalog.js";
 import { VANILLA_FLUIDS } from "../src/vanillaFluids.js";
 import { VANILLA_LOOT } from "../src/vanillaLoot.js";
-import { attachVanillaEngineDump } from "./vanillaEngineDump.js";
+import { maybeAttachVanillaEngineDump } from "./vanillaEngineDumpGate.js";
 
 /** Subscribes to schema-5 IPC + JSON discovery, then hydrates vanilla/overlay and broadcasts `ready`. */
 export function startBedrockRegistryHost(): void {
-  attachVanillaEngineDump();
+  maybeAttachVanillaEngineDump();
   const catalog = createCatalog({ tags: { item: VANILLA_ITEM_TAGS, block: VANILLA_BLOCK_TAGS } });
   const dropHooks = {};
   const persist = attachPersist(

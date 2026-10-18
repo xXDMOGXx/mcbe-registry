@@ -30,6 +30,8 @@ export type { Transport, ScriptEventSystem } from "./transport.js";
 export { createRegistryHost } from "./rpcHost.js";
 export type { RegistryHost, HostSend } from "./rpcHost.js";
 export { attachIpcHost } from "./ipcHost.js";
+export { fingerprintOf, ingestSourceKind } from "./ingestSourceKind.js";
+export type { IngestSourceKindResult } from "./ingestSourceKind.js";
 export { attachPersist } from "./persist.js";
 export type { PersistSession, PersistClock, PersistHooks, PersistDropHooks } from "./persist.js";
 export { CATALOG_HYDRATE_BUDGET, hydrateCatalogJob } from "./hydrateCatalog.js";

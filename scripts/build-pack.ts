@@ -47,6 +47,13 @@ function copyDir(src: string, dest: string): void {
   fs.cpSync(src, dest, { recursive: true });
 }
 
+/** esbuild `define` for the engine-gap dump scriptevent. */
+export function registryDumpDefines(): Record<string, string> {
+  return {
+    "process.env.MCBAB_REGISTRY_DUMP": JSON.stringify(process.env.MCBAB_REGISTRY_DUMP === "1" ? "1" : "0"),
+  };
+}
+
 /** Writes `dist/BP` for Bedrock Registry. */
 export async function buildBedrockRegistryPack(modDir = packRoot): Promise<string> {
   const pkg = JSON.parse(fs.readFileSync(path.join(modDir, "package.json"), "utf8")) as { version: string };
@@ -66,6 +73,7 @@ export async function buildBedrockRegistryPack(modDir = packRoot): Promise<strin
     target: "es2022",
     logLevel: "silent",
     external: ["@minecraft/server", "@minecraft/server-ui"],
+    define: registryDumpDefines(),
   });
 
   fs.writeFileSync(
@@ -95,6 +103,8 @@ function deployDev(modDir: string, deployRoot: string | undefined): void {
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (isMain) {
   const deploy = process.argv.includes("--dev");
+  if (process.argv.includes("--registry-dump")) process.env.MCBAB_REGISTRY_DUMP = "1";
+  else delete process.env.MCBAB_REGISTRY_DUMP;
   if (deploy) loadDotEnv(packRoot);
   buildBedrockRegistryPack(packRoot)
     .then(() => {

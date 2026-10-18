@@ -1,5 +1,11 @@
 # @mcbab-mods/bedrock-registry
 
+## 2.1.0
+
+### Minor Changes
+
+- Default pack zips omit the engine-gap dump tables and scriptevent. Host can ingest a source overlay in-process (`ingestSourceKind`) without an IPC register round-trip.
+
 ## 2.0.0
 
 ### Major Changes

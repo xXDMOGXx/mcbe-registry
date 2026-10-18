@@ -3,8 +3,6 @@ import {
   DEFAULT_REGISTRY_KIND,
   PROTOCOL_SCHEMA,
   advertisedSchema,
-  canonicalizeDocuments,
-  canonicalizeRecipes,
   decodeMatchQuery,
   decodeRecipe,
   documentsFromOverlayList,
@@ -25,6 +23,7 @@ import {
 } from "@mcbe-registry/client";
 import type { Catalog } from "./catalog.js";
 import { documentHasBadAmount } from "./catalog.js";
+import { fingerprintOf } from "./ingestSourceKind.js";
 import type { PersistDropHooks, PersistHooks } from "./persist.js";
 import { isValidSource } from "./sourceStore.js";
 
@@ -39,14 +38,6 @@ function isFingerprintPing(payload: {
     payload.recipes.length === 0 &&
     overlayListsEmpty(payload)
   );
-}
-
-function fingerprintOf(kind: string, documents: readonly unknown[]): string {
-  if (kind === DEFAULT_REGISTRY_KIND) return canonicalizeRecipes(documents as Recipe[]);
-  const withIds = documents.filter(
-    (d): d is { id: string } => typeof d === "object" && d !== null && typeof (d as { id?: unknown }).id === "string",
-  );
-  return canonicalizeDocuments(withIds);
 }
 
 function documentHasStation(document: unknown, station: string): boolean {
